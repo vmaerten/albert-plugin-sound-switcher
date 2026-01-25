@@ -11,14 +11,13 @@ import threading
 import time
 from albert import (
     Action,
+    Icon,
     PluginInstance,
     StandardItem,
-    TriggerQueryHandler,
-    Query,
-    makeThemeIcon,
+    GeneratorQueryHandler,
 )
 
-md_iid = "4.0"
+md_iid = "5.0"
 md_version = "1.0"
 md_name = "Switch Sound Output"
 md_description = "Switch audio output and move active streams"
@@ -111,10 +110,10 @@ def switch_to_sink(sink_name):
     thread.start()
 
 
-class Plugin(PluginInstance, TriggerQueryHandler):
+class Plugin(PluginInstance, GeneratorQueryHandler):
     def __init__(self):
         PluginInstance.__init__(self)
-        TriggerQueryHandler.__init__(self)
+        GeneratorQueryHandler.__init__(self)
 
     def id(self):
         return "switch-sound"
@@ -131,35 +130,31 @@ class Plugin(PluginInstance, TriggerQueryHandler):
     def synopsis(self, query):
         return "<output name>"
 
-    def handleTriggerQuery(self, query: Query):
-        if not query.isValid:
+    def items(self, ctx):
+        if not ctx.isValid:
             return
 
-        query_str = query.string.strip().lower()
+        query_str = ctx.query.strip().lower()
 
         try:
             sinks = get_sinks()
             default_sink = get_default_sink()
         except Exception:
-            query.add(
-                StandardItem(
-                    id="switch-sound-error",
-                    text="Error loading audio outputs",
-                    subtext="Check if PulseAudio/PipeWire is running",
-                    icon_factory=lambda: makeThemeIcon("dialog-error"),
-                )
-            )
+            yield [StandardItem(
+                id="switch-sound-error",
+                text="Error loading audio outputs",
+                subtext="Check if PulseAudio/PipeWire is running",
+                icon_factory=lambda: Icon.theme("dialog-error"),
+            )]
             return
 
         if not sinks:
-            query.add(
-                StandardItem(
-                    id="switch-sound-error",
-                    text="No audio outputs found",
-                    subtext="Make sure PulseAudio/PipeWire is running",
-                    icon_factory=lambda: makeThemeIcon("dialog-error"),
-                )
-            )
+            yield [StandardItem(
+                id="switch-sound-error",
+                text="No audio outputs found",
+                subtext="Make sure PulseAudio/PipeWire is running",
+                icon_factory=lambda: Icon.theme("dialog-error"),
+            )]
             return
 
         items = []
@@ -188,7 +183,7 @@ class Plugin(PluginInstance, TriggerQueryHandler):
                 id=f"switch-sound-{sink['id']}",
                 text=text,
                 subtext=sink_name,
-                icon_factory=lambda icon=icon_name: makeThemeIcon(icon),
+                icon_factory=lambda icon=icon_name: Icon.theme(icon),
                 actions=[
                     Action(
                         id="switch",
@@ -198,6 +193,5 @@ class Plugin(PluginInstance, TriggerQueryHandler):
                 ],
             ))
 
-        if query.isValid:
-            for item in items:
-                query.add(item)
+        if ctx.isValid and items:
+            yield items
